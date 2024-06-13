@@ -1,5 +1,7 @@
 import logging
 import os
+import json
+import pandas as pd
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -102,3 +104,85 @@ class IterXFAMuSMetric(Metric):
             "iterx_famus_slot_r": recall,
             "iterx_famus_slot_f1": f1
         }
+
+# Utility functions for FAMuS metric
+def compute_ceafe_rme_scores(gold_file, predictions,
+                             ignore_no_template_doc=False ,
+                             sanitize_special_chars= False,
+                             scorer_type = 'phi-3-levenshtein'):    
+    # Soft Match
+    iterx_famus = IterXFAMuSMetric({gold_file: gold_file},
+                                   scorer_type = scorer_type,
+                                   ignore_no_template_doc = ignore_no_template_doc,
+                                   sanitize_special_chars = sanitize_special_chars)
+    iterx_famus(predictions,
+                gold_file,
+                normalize_role = False)
+    return iterx_famus.get_metric(reset=True)['iterx_famus_slot_f1']
+
+def convert_gold_iterx_dict_to_jsonl_file(gold_data_dict, 
+                                          output_file="temp_gold_data_can_be_deleted.jsonl"):
+    """
+    This is a helper function to convert the gold data dict to a jsonl file
+    This is needed since the FAMuS metric expects the gold data in a jsonl file format
+    """
+    with open(output_file, 'w') as f:
+        for instance_id, template_list in gold_data_dict.items():
+            current_dict = {}
+            current_dict['docid'] = instance_id
+            current_dict['templates'] = template_list
+            f.write(json.dumps(current_dict) + "\n")
+
+
+def out_compute_ceafe_rme_scores(gold_predictions,
+                                 predictions,
+                                ignore_no_template_doc =False ,
+                                sanitize_special_chars= False,
+                                metrics = ('CEAF_RME_phi-3', 'CEAF_RME_phi-a')):
+                                
+    # Exact Match
+    temp_gold_file = 'gold.jsonl'
+    convert_gold_iterx_dict_to_jsonl_file(gold_predictions, temp_gold_file)
+
+    iterx_famus = IterXFAMuSMetric({temp_gold_file: temp_gold_file},
+                               scorer_type = 'phi-3',
+                               ignore_no_template_doc = ignore_no_template_doc,
+                               sanitize_special_chars = sanitize_special_chars)
+    iterx_famus(predictions, 
+            temp_gold_file,
+            normalize_role = False)
+    
+    exact_match_dict = iterx_famus.get_metric(reset=True)
+
+    # Soft Match
+    iterx_famus = IterXFAMuSMetric({temp_gold_file: temp_gold_file},
+                                   scorer_type = 'phi-3-levenshtein',
+                                   ignore_no_template_doc = ignore_no_template_doc,
+                                   sanitize_special_chars = sanitize_special_chars)
+    iterx_famus(predictions,
+                temp_gold_file,
+                normalize_role = False)
+    soft_match_dict = iterx_famus.get_metric(reset=True)
+
+
+    # Get a dataframe
+    metric_rows = []
+
+    if 'CEAF_RME_phi-3' in metrics:
+        current_row = {'metric': 'CEAF_RME_phi-3',
+         'P': round(100*exact_match_dict['iterx_famus_slot_p'],2),
+         'R': round(100*exact_match_dict['iterx_famus_slot_r'],2),
+         'F1': round(100*exact_match_dict['iterx_famus_slot_f1'],2)
+         }
+        metric_rows.append(current_row)
+
+    if 'CEAF_RME_phi-a' in metrics:
+        current_row = {'metric': 'CEAF_RME_phi-a',
+         'P': round(100*soft_match_dict['iterx_famus_slot_p'],2),
+         'R': round(100*soft_match_dict['iterx_famus_slot_r'],2),
+         'F1': round(100*soft_match_dict['iterx_famus_slot_f1'],2)
+         }
+        metric_rows.append(current_row)
+        
+    
+    return pd.DataFrame(metric_rows)
