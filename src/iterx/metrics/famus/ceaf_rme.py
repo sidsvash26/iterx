@@ -359,13 +359,15 @@ class CEAFRMEPhi3Scorer(CountSingletonsScorer):
             for j, cluster in enumerate(clusters):
                 # scores[i, j], r_scores[i, j], p_scores[i, j] = scoring_subroutine(gold_cluster, cluster)
                 scores[i, j] = scoring_subroutine(gold_cluster, cluster)
-        row, col = linear_sum_assignment(-scores)
-
-        # recall similarity is different w.r.t. CEAF-REE definition
-        similarity = sum(scores[row, col])
-        r_similarity = len([m for c in gold_clusters for e in c for m in e])
-        p_similarity = len([m for c in clusters for e in c for m in e])
-        # p_similarity = len([m for c in clusters for e in clusters for m in e])
+        if len(gold_clusters) == len(clusters) == 0:
+            similarity = r_similarity = p_similarity = 1.0
+        else:
+            row, col = linear_sum_assignment(-scores)
+            # recall similarity is different w.r.t. CEAF-REE definition
+            similarity = sum(scores[row, col])
+            r_similarity = len([m for c in gold_clusters for e in c for m in e])
+            p_similarity = len([m for c in clusters for e in c for m in e])
+            # p_similarity = len([m for c in clusters for e in clusters for m in e])
 
         if output_raw:
             return similarity, p_similarity, similarity, r_similarity, scores, None, clusters, (row, col)
@@ -480,12 +482,14 @@ class CEAFRMEPhi3LevenshteinScorer(CEAFRMEScorer):
             for j, cluster in enumerate(clusters):
                 # scores[i, j], r_scores[i, j], p_scores[i, j] = scoring_subroutine(gold_cluster, cluster)
                 scores[i, j] = scoring_subroutine(gold_cluster, cluster)
-        row, col = linear_sum_assignment(-scores)
-
-        # recall similarity is different w.r.t. CEAF-REE definition
-        similarity = sum(scores[row, col])
-        r_similarity = len([m for c in gold_clusters for e in c for m in e])
-        p_similarity = len([m for c in clusters for e in c for m in e])
+        if len(gold_clusters) == len(clusters) == 0:
+            similarity = r_similarity = p_similarity = 1.0
+        else:
+            row, col = linear_sum_assignment(-scores)
+            # recall similarity is different w.r.t. CEAF-REE definition
+            similarity = sum(scores[row, col])
+            r_similarity = len([m for c in gold_clusters for e in c for m in e])
+            p_similarity = len([m for c in clusters for e in c for m in e])
         # p_similarity = len([m for c in clusters for e in clusters for m in e])
 
         if output_raw:
