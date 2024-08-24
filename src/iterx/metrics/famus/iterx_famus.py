@@ -3,7 +3,7 @@ import os
 import json
 import pandas as pd
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from allennlp.training.metrics import Metric
 from overrides import overrides
@@ -134,16 +134,20 @@ def convert_gold_iterx_dict_to_jsonl_file(gold_data_dict,
             f.write(json.dumps(current_dict) + "\n")
 
 
-def out_compute_ceafe_rme_scores(gold_predictions,
+def out_compute_ceafe_rme_scores(gold_predictions: Union[str, Dict],
                                  predictions,
                                 ignore_no_template_doc =False ,
                                 sanitize_special_chars= False,
                                 metrics = ('CEAF_RME_phi-3', 'CEAF_RME_phi-a')):
                                 
+    # If gold_predictions is a iterx formatted jsonl file itself, process it as it is
+    if isinstance(gold_predictions, str):
+        temp_gold_file = gold_predictions
+    # Else convert the gold_predictions to a jsonl file
+    else:
+        temp_gold_file = 'gold.jsonl'
+        convert_gold_iterx_dict_to_jsonl_file(gold_predictions, temp_gold_file)
     # Exact Match
-    temp_gold_file = 'gold.jsonl'
-    convert_gold_iterx_dict_to_jsonl_file(gold_predictions, temp_gold_file)
-
     iterx_famus = IterXFAMuSMetric({temp_gold_file: temp_gold_file},
                                scorer_type = 'phi-3',
                                ignore_no_template_doc = ignore_no_template_doc,
